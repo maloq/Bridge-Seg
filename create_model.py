@@ -1,23 +1,13 @@
 import torch
-from torch.utils.data import Dataset
-from torchvision.transforms import ToTensor
-import matplotlib.pyplot as plt
 from torch import nn
-from torch.utils.data import DataLoader
-import os
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torchvision import transforms
-from torch.utils.data import DataLoader, random_split
 import pytorch_lightning as pl
-import json
-import numpy as np
 import torchmetrics
 from torchmetrics.classification import BinaryJaccardIndex
-from torchmetrics import MaxMetric, MeanMetric, MinMetric
+from torchmetrics import MaxMetric, MeanMetric
 from collections import OrderedDict
-from torchvision.transforms import v2
 torch.set_float32_matmul_precision('high')
 
 
@@ -75,13 +65,12 @@ class LitSegmentator(pl.LightningModule):
         self.weight_decay = weight_decay
         self.loss = nn.BCEWithLogitsLoss()
         self.train_loss = MeanMetric()
-        self.train_precision = torchmetrics.Precision(num_classes=1, task='binary')
-        self.train_recall = torchmetrics.Recall(num_classes=1, task='binary')
         self.val_loss = MeanMetric()
-        self.val_precision = torchmetrics.Precision(num_classes=1, task='binary')
-        self.val_recall = torchmetrics.Recall(num_classes=1, task='binary')
-        # self.jaccard_train = BinaryJaccardIndex()
-        # self.jaccard_val = BinaryJaccardIndex()
+        self.test_loss = MeanMetric()
+
+        self.jaccard_train = BinaryJaccardIndex()
+        self.jaccard_val = BinaryJaccardIndex()
+        self.jaccard_val_best = MaxMetric()
             
     def training_step(self, batch, batch_idx):
 
@@ -92,7 +81,10 @@ class LitSegmentator(pl.LightningModule):
         self.train_loss(loss)
         t = torch.Tensor([0.5]).cuda()  # threshold
         predictions_bin = (predictions > t).to(int)
+        self.jaccard_train(predictions_bin.flatten(), target.flatten().to(int))
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/jaccard", self.jaccard_train, on_step=False, on_epoch=True, prog_bar=True)
+
         output = OrderedDict(
             {
                 "loss": loss,
@@ -112,7 +104,36 @@ class LitSegmentator(pl.LightningModule):
         self.val_loss(loss)
         t = torch.Tensor([0.5]).cuda()  # threshold
         predictions_bin = (predictions > t).to(int)
+        self.jaccard_val(predictions_bin.flatten(), target.flatten().to(int))
+        
+        self.log("val/jaccard", self.jaccard_val, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
+        output = OrderedDict(
+            {
+                "loss": loss,
+                "preds": predictions,
+                "target": target,
+            }
+        )
+        return output
+    
+
+    def on_validation_epoch_end(self):
+        jaccard_val = self.jaccard_val.compute()
+        self.jaccard_val_best(jaccard_val)
+        self.log("val/jaccard_best", self.jaccard_val_best.compute(), prog_bar=True)
+
+
+    def test_step(self, batch, batch_idx):
+        x, target = batch
+        predictions = self.net(x)
+        predictions = torch.squeeze(predictions)
+        loss = self.loss(predictions, target)
+        
+        self.test_loss(loss)
+        t = torch.Tensor([0.5]).cuda()  # threshold
+        predictions_bin = (predictions > t).to(int)
+        self.log("test/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=False)
         output = OrderedDict(
             {
                 "loss": loss,

@@ -1,0 +1,5 @@
+fiftyone
+pycocotools
+natsort
+pytorch_lightning
+opencv-python
