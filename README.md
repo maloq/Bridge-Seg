@@ -12,12 +12,8 @@ Images should be in folder `data/BrigeImages/images`
 Annotation file should be in folder `data/BrigeImages/instances_default.json`
 
 ## Set up environment
-Clone DINOv2 repo:
 
-`git clone https://github.com/facebookresearch/dinov2`
-
-And install according to repo readme(not extended version)
-Then install additional requirements from requirements.txt. Better to use new conda environment
+Then install requirements from requirements.txt
 
 `pip install -r requirements.txt`
 

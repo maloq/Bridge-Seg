@@ -2,4 +2,6 @@ fiftyone
 pycocotools
 natsort
 pytorch_lightning
+torch
+torchvision
 opencv-python
