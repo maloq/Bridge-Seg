@@ -15,12 +15,12 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #This ideally should be in config file 
-BATCH_SIZE = 10
-WORKERS = 2
+BATCH_SIZE = 2
+WORKERS = 1
 LR = 1e-4
 WD = 0.03
 MAX_EPOCHS = 60
-DINO_MODEL_NAME = 'dinov2_s'
+DINO_MODEL_NAME = 'dinov2_b'
 
     
 

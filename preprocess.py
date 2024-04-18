@@ -18,24 +18,34 @@ def coco_annotations_to_masks(ann_path, images_folder, ext):
     if not os.path.exists(new_folder_path):
         os.mkdir(new_folder_path)
     else:
-        print('Masks foldser exists, skipping')
-    
+        print('Masks folder exists, skipping')
+        return new_folder_path
+    skipped = []
     for img_num in tqdm(coco.imgs, desc ="Coco annotations to masks", unit = " images"):
         img = coco.imgs[img_num]
         cat_ids = coco.getCatIds()
         anns_ids = coco.getAnnIds(imgIds=img['id'], catIds=cat_ids, iscrowd=None)
         anns = coco.loadAnns(anns_ids)
-        coco.showAnns(anns)
-        if len(anns)>0:
+
+        if len(anns[0]['segmentation']) == 0:
+            skipped.append(img_num)
+            continue
+
+        if len(anns) > 1:
             mask = coco.annToMask(anns[0])
-            for i in range(len(anns)):
-                mask += coco.annToMask(anns[i])
+            for ann in anns[1:]:
+                mask += coco.annToMask(ann)
+                if len(ann['segmentation']) == 0:
+                    skipped.append(img_num)
+                    continue
+        elif len(anns) == 1:
+            mask = coco.annToMask(anns[0])
         else:
             mask = np.zeros([img['height'], img['width']])
         mask = mask*255
         filename = os.path.join(new_folder_path, img['file_name'].replace(ext, 'png'))
         cv2.imwrite(filename, mask) 
-
+    print(f'Skipped {skipped}')
     return new_folder_path
 
 

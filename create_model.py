@@ -12,19 +12,25 @@ torch.set_float32_matmul_precision('high')
 
 
 class conv_head(nn.Module):
-    def __init__(self, embedding_size = 384, num_classes=1):
+    def __init__(self, embedding_size = 768, num_classes=1):
         super(conv_head, self).__init__()
         self.net = nn.Sequential(
             nn.Upsample(scale_factor=2),
-            nn.Conv2d(embedding_size, 128, (3,3), padding=(1,1)),
+            nn.Conv2d(embedding_size, 256, (3, 3), padding=(1, 1)),
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.Conv2d(256, 128, (3, 3), padding=(1, 1)),
             nn.ReLU(),
             nn.BatchNorm2d(128),
-            nn.Conv2d(128, 128, (3,3), padding=(1,1)),
+            nn.Conv2d(128, 128, (3, 3), padding=(1, 1)),
             nn.ReLU(),
             nn.BatchNorm2d(128),
-            nn.Conv2d(128, 64, (3,3), padding=(1,1)),
+            nn.Conv2d(128, 64, (3, 3), padding=(1, 1)),
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.Conv2d(64, 64, (3, 3), padding=(1, 1)),
             nn.Upsample(scale_factor=2),
-            nn.Conv2d(64, num_classes, (3,3), padding=(1,1)),
+            nn.Conv2d(64, num_classes, (3, 3), padding=(1, 1)),
         )
     def forward(self, x):
         x = self.net(x)
