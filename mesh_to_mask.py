@@ -220,7 +220,7 @@ def create_masks_from_meshes(meshes:list[np.ndarray], img:np.ndarray, rotation:n
         # Big mask containing all in grayscale
         big_mask_width = u_max - u_min + 1
         big_mask_height = v_max - v_min + 1
-        print(f"Creating mask with {big_mask_width, big_mask_height} shape")
+        # print(f"Creating mask with {big_mask_width, big_mask_height} shape")
         big_mask = np.zeros((big_mask_height, big_mask_width), dtype=np.uint8)
         # Translation vector moving the origin: how the big mask origin sees the original origin
         t_big_mask = np.int32([-u_min, -v_min])
@@ -268,9 +268,8 @@ def get_image_data_from_json(image_name, json_file_path):
 
 
 def get_camera_intrinsics_from_json(image_name, json_file_path):
-    """ Loads image extrinsics using image name and given json file with sertain structure"""
-    viewId, poseId, frameId, intrinsicId, _, _ = get_image_data_from_json(image_name, json_file_path)
-    #load json as dict 
+    """ Loads camera intrinsics using image name and given json file with sertain structure"""
+    _, _, _, intrinsicId, _, _ = get_image_data_from_json(image_name, json_file_path)
     with open(json_file_path) as json_file:
         data = json.load(json_file)
     intrinsics = data['intrinsics']

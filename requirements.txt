@@ -1,7 +1,9 @@
 fiftyone
 pycocotools
 natsort
-pytorch_lightning
 torch
+pytorch_lightning
+torchmetrics
 torchvision
 opencv-python
+trimesh
