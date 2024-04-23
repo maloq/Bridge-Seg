@@ -13,25 +13,24 @@ import pytorch_lightning as pl
 
 import warnings
 warnings.filterwarnings("ignore")
-
-#This ideally should be in config file 
-BATCH_SIZE = 2
-WORKERS = 1
-LR = 1e-4
-WD = 0.03
-MAX_EPOCHS = 60
-DINO_MODEL_NAME = 'dinov2_b'
-
     
 
 class DataModule(pl.LightningDataModule):
-    def __init__(self, img_dir, mask_dir, train_images_names=None, val_images_names=None, train_size=50):
+    def __init__(self, img_dir, mask_dir,
+                train_images_names=None,
+                val_images_names=None,
+                train_size=50,
+                batch_size=1,
+                workers=0):
+        
         super().__init__()
         self.img_dir = img_dir
         self.mask_dir = mask_dir
         self.train_images_names = train_images_names
         self.val_images_names = val_images_names
         self.train_size = train_size
+        self.batch_size = batch_size
+        self.workers = workers
         dataset = SegmentationDataset(img_dir=self.img_dir,
                                       mask_dir=self.mask_dir,
                                       num_classes = 1,
@@ -48,7 +47,7 @@ class DataModule(pl.LightningDataModule):
             v2.RandomResizedCrop(scale=(0.8, 1.0), size=(14*64,14*64), antialias=True),  # Or Resize(antialias=True)
             v2.ToTensor(),
             # mean=[102.9221/255, 105.5417/255,  97.7115/255], std=[78.5406/255, 74.1163/255, 71.4406/255]
-            v2.Normalize(mean=[total_mean[0]/255, total_mean[1]/255, total_mean[2]/255], std=[total_std[0]/255, total_std[1]/255, total_std[2]/255]),
+            #v2.Normalize(mean=[total_mean[0]/255, total_mean[1]/255, total_mean[2]/255], std=[total_std[0]/255, total_std[1]/255, total_std[2]/255]),
         ])
         self.mask_transform = v2.Compose([
             v2.Resize((32*8,32*8)),
@@ -90,16 +89,19 @@ class DataModule(pl.LightningDataModule):
 
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS, drop_last=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size,
+                           shuffle=True, num_workers=self.workers, drop_last=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS, drop_last=True)
+        return DataLoader(self.val_dataset, batch_size=self.batch_size,
+                           shuffle=True, num_workers=self.workers, drop_last=True)
     
     def test_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS, drop_last=True)
+        return DataLoader(self.val_dataset, batch_size=self.batch_size,
+                           shuffle=True, num_workers=self.workers, drop_last=True)
     
 
-def prepare_model(checkpoint_path=None):
+def prepare_model(checkpoint_path=None, lr=0.001, weight_decay=0.001, dino_model_name='dinov2_s'):
     dino_models = {
                     'dinov2_s':{
                         'name':'dinov2_vits14_reg',
@@ -122,7 +124,7 @@ def prepare_model(checkpoint_path=None):
                         'patch_size':14
                     },
                 }
-    dino_model_data = dino_models[DINO_MODEL_NAME]
+    dino_model_data = dino_models[dino_model_name]
     dinov2_backbone = load('facebookresearch/dinov2',  dino_model_data['name'])
     model = SegmentationNet(backbone=dinov2_backbone,
                             head=conv_head,
@@ -131,20 +133,36 @@ def prepare_model(checkpoint_path=None):
     if checkpoint_path:
         segmentator = LitSegmentator.load_from_checkpoint(checkpoint_path,
                                                           net=model,
-                                                          lr=LR,
-                                                          weight_decay=WD)
+                                                          lr=lr,
+                                                          weight_decay=weight_decay)
     else:
-        segmentator = LitSegmentator(model, lr=LR, weight_decay=WD)
+        segmentator = LitSegmentator(model, lr=lr, weight_decay=weight_decay)
 
     return segmentator
     
 
 if  __name__ == '__main__':
 
+    BATCH_SIZE = 2
+    WORKERS = 1
+    LR = 1e-4
+    WD = 0.03
+    MAX_EPOCHS = 60
+    DINO_MODEL_NAME = 'dinov2_b'
+
     img_dir_resized ='data/BrigeImages/images_6x_downscaled'
     mask_dir_resized ='data/BrigeImages/images_masks_6x_downscaled'
-    segmentator = prepare_model()
-    dm = DataModule(img_dir_resized, mask_dir_resized, train_images_names=None, val_images_names=None, train_size=50)
+    segmentator = prepare_model(checkpoint_path=None,
+                                lr=LR,
+                                weight_decay=WD,
+                                dino_model_name=DINO_MODEL_NAME)
+    dm = DataModule(img_dir_resized,
+                    mask_dir_resized,
+                    train_images_names=None,
+                    val_images_names=None,
+                    train_size=50,
+                    batch_size=BATCH_SIZE)
+    
     trainer = pl.Trainer(
                         max_epochs=MAX_EPOCHS,
                         precision='16-mixed',

@@ -43,6 +43,9 @@ def coco_annotations_to_masks(ann_path, images_folder, ext):
         else:
             mask = np.zeros([img['height'], img['width']])
         mask = mask*255
+        mask = mask.astype(np.uint8)
+        if len(mask.shape)>2:
+            mask = mask[0, :, :]
         filename = os.path.join(new_folder_path, img['file_name'].replace(ext, 'png'))
         cv2.imwrite(filename, mask) 
     print(f'Skipped {skipped}')
@@ -51,7 +54,8 @@ def coco_annotations_to_masks(ann_path, images_folder, ext):
 
 def resize_images_folder(raw_images_folder, downscale_factor, ext, interpolation=cv2.INTER_LINEAR):
     new_folder_path = raw_images_folder + f'_{downscale_factor}x_downscaled'
-    os.mkdir(new_folder_path)
+    if not os.path.exists(new_folder_path):
+         os.makedirs(new_folder_path)
     hw_set = set()
     
     for filepath in tqdm(glob.glob(os.path.join(raw_images_folder, f'*.{ext}')), desc ="Images resize and save", unit = " images"):
@@ -61,12 +65,31 @@ def resize_images_folder(raw_images_folder, downscale_factor, ext, interpolation
         hw_set.add((h, w))
         resized_image = cv2.resize(image, (int(w/downscale_factor), (int(h/downscale_factor))), interpolation=interpolation) 
         filename = os.path.join(new_folder_path, os.path.basename(filepath))
+        resized_image
         cv2.imwrite(filename, resized_image) 
     
     if len(hw_set)>1:
         print(f'Not all images are the same size: {hw_set}')
 
     return new_folder_path
+
+
+def overlay(image, mask, color, alpha, resize=None):
+
+    color = color[::-1]
+    colored_mask = np.expand_dims(mask, 0).repeat(3, axis=0)
+    colored_mask = np.moveaxis(colored_mask, 0, -1)
+    masked = np.ma.MaskedArray(image, mask=colored_mask, fill_value=color)
+    image_overlay = masked.filled()
+
+    if resize is not None:
+        image = cv2.resize(image.transpose(1, 2, 0), resize)
+        image_overlay = cv2.resize(image_overlay.transpose(1, 2, 0), resize)
+
+    image_combined = cv2.addWeighted(image, 1 - alpha, image_overlay, alpha, 0)
+
+    return image_combined
+
 
 if __name__ == '__main__':
     raw_images_folder = '/home/teshbek/datasets/BrigeImages/images'
